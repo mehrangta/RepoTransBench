@@ -95,6 +95,42 @@
 
 We introduce **RepoTransAgent**, a general agent framework for repository-level code translation based on the ReAct (Reasoning + Acting) paradigm.
 
+### Bounded finish recovery in this fork
+
+The enhanced agent uses a shared recovery rule for Python → C++ and JavaScript → Python. When the model calls `Finished`, the agent checks the latest supplied-runner result. If the build or tests have yet to show a clean pass, it can return up to two repair observations within the same 20-request limit. A clean pass requires a successful build and at least one test, with every test passing and zero failures, errors, or skips.
+
+Both adapters build a source contract offline and refresh up to 4,000 characters of source chunks per request, reserving space for related definitions and calls. Python → C++ generates CMake from an implementation manifest and includes localized diagnostics and current code in its repair feedback. JavaScript → Python builds the package scaffold from a module manifest and parses quiet pytest summaries from the supplied runner.
+
+| Direction | Saved strongest base full success | With finish recovery | Build validity, base → recovery | Reported tokens, base → recovery |
+| --- | ---: | ---: | ---: | ---: |
+| Python → C++ | 22/156 (14.10%) | **37/156 (23.72%)** | 45/156 → 66/156 | 15,037,102 → 25,745,886 |
+| JavaScript → Python | 64/179 (35.75%) | **90/179 (50.28%)** | 130/179 → 173/179 | 10,228,600 → 19,571,291 |
+
+These results compare 335 valid tasks with saved single-run controls on `cx/gpt-6-luna(low)`. The fresh eight-task confirmation for each direction tied on full success. The supplied tests were visible or executable during generation, and a separate evaluator scored the candidates afterward. [Evaluation details and per-repository results](docs/finish-recovery.md)
+
+#### Run the enhanced agent
+
+Use Python 3.10+ and extract the benchmark dataset. Run from the repository root in an isolated benchmark environment with the target toolchain. Python → C++ needs CMake, a C++17 compiler, and GoogleTest. JavaScript → Python needs pytest, which the enhanced requirements install. [Benchmark dataset](https://github.com/DeepSoftwareAnalytics/RepoTransBench/releases/tag/v1.0)
+
+```bash
+python -m pip install -r requirements-enhanced.txt
+
+# Point this at the dataset root. The default is /workspace.
+export REPOTRANS_WORKSPACE=/workspace
+# Set REPOTRANS_API_KEY in your environment before running.
+export REPOTRANS_BASE_URL=https://api.openai.com/v1
+
+python -m RepoTransAgent.run_enhanced \
+    --project_name tartley_colorama \
+    --source_language Python \
+    --target_language 'C++' \
+    --model_name gpt-4.1
+```
+
+For JavaScript → Python, use `--project_name aceakash_string-similarity --source_language JavaScript --target_language Python`. Set `REPOTRANS_BASE_URL` to your provider's OpenAI-compatible API base and choose a model exposed by that provider. The benchmark model requires access to the endpoint that serves it.
+
+The agent writes candidate files to `$REPOTRANS_WORKSPACE/translated_projects/<model>/<source>/<target>/<project>` and replaces that directory on another run with the same settings. It writes conversation logs, manifest receipts, and finish decisions to a new directory under `logs/enhanced/`. Use `--artifacts-dir` to choose a new directory.
+
 ### Key Capabilities
 
 - **ReadFile**: Examine code files, configurations, and documentation
@@ -224,6 +260,8 @@ RepoTransBench/
 │   ├── actions.py              # Action definitions (CreateFile, ReadFile, etc.)
 │   ├── generator.py            # LLM API client and response handling
 │   ├── run.py                  # Single project translation script
+│   ├── run_enhanced.py         # Benchmarked adapters with bounded finish recovery
+│   ├── enhanced/              # Source retrieval, manifests, and recovery logic
 │   ├── run_batch.py            # Batch processing script
 │   ├── test_analyzer.py        # Multi-language test result analysis
 │   ├── API_KEY.txt             # API keys configuration

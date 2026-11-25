@@ -3,15 +3,16 @@
 import json
 import os
 from RepoTransAgent.actions import AVAILABLE_ACTIONS
+from RepoTransAgent.workspace import workspace_root
 
 
-def get_react_translation_prompt(source_language, target_language, project_name):
+def get_react_translation_prompt(source_language, target_language, project_name, *, source_context=None):
     # Generate action descriptions
     action_descriptions = "\n".join([action_cls.get_action_description() for action_cls in AVAILABLE_ACTIONS])
     
     # Read project structure, source files, and tests content
     project_structure = get_project_structure(source_language, target_language, project_name)
-    source_files_content = get_source_files_content(source_language, project_name)
+    source_files_content = get_source_files_content(source_language, project_name) if source_context is None else source_context
     public_tests_content = get_public_tests_content(source_language, target_language, project_name)
     original_tests_content = get_original_tests_content(source_language, target_language, project_name)
     run_tests_script = get_run_tests_script(source_language, target_language, project_name)
@@ -124,7 +125,7 @@ def get_source_files_content(source_language, project_name):
         extensions = code_extensions.get(source_language, ['.txt'])
         
         # Source project path
-        source_path = f"/workspace/source_projects/{source_language}/{project_name}"
+        source_path = str(workspace_root() / "source_projects" / source_language / project_name)
         if not os.path.exists(source_path):
             return f"Source project not found: {source_path}"
         
@@ -179,7 +180,7 @@ def get_project_structure(source_language, target_language, project_name):
     """Read and return project structure for the specified project"""
     try:
         # Read projects summary to get structure file path
-        summary_path = "/workspace/target_projects/projects_summary.jsonl"
+        summary_path = workspace_root() / "target_projects" / "projects_summary.jsonl"
         if not os.path.exists(summary_path):
             return "Error: projects_summary.jsonl not found"
         
@@ -203,7 +204,7 @@ def get_project_structure(source_language, target_language, project_name):
             return "No project structure file found"
         
         # Read project structure content
-        project_path = f"/workspace/target_projects/{source_language}/{target_language}/{project_name}"
+        project_path = workspace_root() / "target_projects" / source_language / target_language / project_name
         structure_path = os.path.join(project_path, structure_file)
         
         if os.path.exists(structure_path):
@@ -222,7 +223,7 @@ def get_run_tests_script(source_language, target_language, project_name):
     """Read and return run_tests.sh script content"""
     try:
         # Read projects summary to get script path
-        summary_path = "/workspace/target_projects/projects_summary.jsonl"
+        summary_path = workspace_root() / "target_projects" / "projects_summary.jsonl"
         if not os.path.exists(summary_path):
             return "Error: projects_summary.jsonl not found"
         
@@ -244,7 +245,7 @@ def get_run_tests_script(source_language, target_language, project_name):
         script_file = project_info.get('run_tests_script', 'run_tests.sh')
         
         # Read script content
-        project_path = f"/workspace/target_projects/{source_language}/{target_language}/{project_name}"
+        project_path = workspace_root() / "target_projects" / source_language / target_language / project_name
         script_path = os.path.join(project_path, script_file)
         
         if os.path.exists(script_path):
@@ -263,7 +264,7 @@ def get_original_tests_content(source_language, target_language, project_name):
     """Read and return original tests content for the specified project"""
     try:
         # Read projects summary
-        summary_path = "/workspace/target_projects/projects_summary.jsonl"
+        summary_path = workspace_root() / "target_projects" / "projects_summary.jsonl"
         if not os.path.exists(summary_path):
             return "Error: projects_summary.jsonl not found"
         
@@ -287,7 +288,7 @@ def get_original_tests_content(source_language, target_language, project_name):
             return "No original tests found for this project"
         
         # Read original test contents
-        project_path = f"/workspace/target_projects/{source_language}/{target_language}/{project_name}"
+        project_path = workspace_root() / "target_projects" / source_language / target_language / project_name
         tests_content = []
         
         for test_path in target_original_tests:
@@ -310,7 +311,7 @@ def get_public_tests_content(source_language, target_language, project_name):
     """Read and return public tests content for the specified project"""
     try:
         # Read projects summary
-        summary_path = "/workspace/target_projects/projects_summary.jsonl"
+        summary_path = workspace_root() / "target_projects" / "projects_summary.jsonl"
         if not os.path.exists(summary_path):
             return "Error: projects_summary.jsonl not found"
         
@@ -334,7 +335,7 @@ def get_public_tests_content(source_language, target_language, project_name):
             return "No public tests found for this project"
         
         # Read public test contents
-        project_path = f"/workspace/target_projects/{source_language}/{target_language}/{project_name}"
+        project_path = workspace_root() / "target_projects" / source_language / target_language / project_name
         tests_content = []
         
         for test_path in target_public_tests:

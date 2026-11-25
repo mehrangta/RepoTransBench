@@ -15,6 +15,7 @@ from RepoTransAgent.generator import Generator
 from RepoTransAgent.prompts.system_prompt import get_react_translation_prompt
 from RepoTransAgent.actions import AVAILABLE_ACTIONS, Action, CreateFile, ReadFile, ExecuteCommand, SearchContent, Finished
 from RepoTransAgent.test_analyzer import TestAnalyzer
+from RepoTransAgent.workspace import workspace_root
 
 # Configure logging
 logging.basicConfig(
@@ -36,25 +37,37 @@ class ReactTranslationAgent:
         self.current_iteration = 0
         
         # Set up paths
-        self.working_path = Path(f"/workspace/translated_projects/{self.model_name.replace('/', '_')}/{self.source_language}/{self.target_language}/{self.project_name}").resolve()
-        self.target_base_path = Path(f"/workspace/target_projects/{self.source_language}/{self.target_language}/{self.project_name}").resolve()
+        workspace = workspace_root()
+        pair_path = Path(self.source_language) / self.target_language / self.project_name
+        self.working_path = (workspace / "translated_projects" / self.model_name.replace('/', '_') / pair_path).resolve()
+        self.target_base_path = (workspace / "target_projects" / pair_path).resolve()
         
         # Setup directories
         self.setup_logging_directory()
         self.setup_working_directory()
         
         # Initialize components
-        self.test_analyzer = TestAnalyzer(self.target_language)
-        self.system_prompt = get_react_translation_prompt(self.source_language, self.target_language, self.project_name)
-        self.generator = Generator(self.args, logger, self.system_prompt)
+        self.test_analyzer = self.create_test_analyzer()
+        self.system_prompt = self.build_system_prompt()
+        self.generator = self.create_generator()
         
         # Save system prompt
         self.save_system_prompt()
 
+    def create_test_analyzer(self):
+        return TestAnalyzer(self.target_language)
+
+    def build_system_prompt(self):
+        return get_react_translation_prompt(self.source_language, self.target_language, self.project_name)
+
+    def create_generator(self):
+        return Generator(self.args, logger, self.system_prompt)
+
     def setup_logging_directory(self):
         """Setup directory for saving conversation logs"""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.log_dir = Path(f"logs/{self.model_name.replace('/', '_')}/{self.project_name}_{self.source_language}_to_{self.target_language}_{timestamp}")
+        log_root = Path(getattr(self.args, "artifacts_dir", "."))
+        self.log_dir = log_root / f"logs/{self.model_name.replace('/', '_')}/{self.project_name}_{self.source_language}_to_{self.target_language}_{timestamp}"
         self.log_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"📁 Log directory: {self.log_dir}")
 
@@ -487,23 +500,25 @@ Start by creating the main implementation files based on what you see in the sou
         return 'timeout'
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Simple React Translation Agent")
-    parser.add_argument('--model_name', type=str, default="claude-sonnet-4-20250514", help="Model name")
+def translation_parser(description, default_model="claude-sonnet-4-20250514"):
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--model_name', type=str, default=default_model,
+                        required=default_model is None, help="Model name")
     parser.add_argument('--project_name', type=str, required=True, help="Project name")
     parser.add_argument('--source_language', type=str, required=True, help="Source language")
     parser.add_argument('--target_language', type=str, required=True, help="Target language")
     parser.add_argument('--max_iterations', type=int, default=20, help="Max iterations")
-    
-    args = parser.parse_args()
-    
+    return parser
+
+
+def run_translation(args, agent_factory=ReactTranslationAgent):
     logger.info(f"🤖 Model: {args.model_name}")
     logger.info(f"📁 Project: {args.project_name}")
     logger.info(f"🔄 Translation: {args.source_language} → {args.target_language}")
     logger.info("-" * 50)
     
     try:
-        agent = ReactTranslationAgent(args)
+        agent = agent_factory(args)
         status = agent.run()
         
         exit_codes = {
@@ -516,11 +531,16 @@ def main():
         
         logger.info(f"🏁 Final status: {status}")
         logger.info(f"📁 All logs saved to: {agent.log_dir}")
-        sys.exit(exit_codes.get(status, 4))
+        return exit_codes.get(status, 4)
         
     except Exception as e:
         logger.error(f"💥 Fatal error: {e}")
-        sys.exit(4)
+        return 4
+
+
+def main():
+    parser = translation_parser("Simple React Translation Agent")
+    sys.exit(run_translation(parser.parse_args()))
 
 
 if __name__ == "__main__":
