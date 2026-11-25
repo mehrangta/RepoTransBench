@@ -101,12 +101,16 @@ The enhanced agent uses a shared recovery rule for Python → C++ and JavaScript
 
 Both adapters build a source contract offline and refresh up to 4,000 characters of source chunks per request, reserving space for related definitions and calls. Python → C++ generates CMake from an implementation manifest and includes localized diagnostics and current code in its repair feedback. JavaScript → Python builds the package scaffold from a module manifest and parses quiet pytest summaries from the supplied runner.
 
-| Direction | Saved strongest base full success | With finish recovery | Build validity, base → recovery | Reported tokens, base → recovery |
-| --- | ---: | ---: | ---: | ---: |
-| Python → C++ | 22/156 (14.10%) | **37/156 (23.72%)** | 45/156 → 66/156 | 15,037,102 → 25,745,886 |
-| JavaScript → Python | 64/179 (35.75%) | **90/179 (50.28%)** | 130/179 → 173/179 | 10,228,600 → 19,571,291 |
+| Direction | Baseline | Success rate, baseline → enhanced | Success gain | Compile rate, baseline → enhanced | Compile gain |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Python → C++ | Raw RepoTransAgent | 5.13% → 23.72% | **+18.59 pp** | 15.38% → 42.31% | **+26.92 pp** |
+| Python → C++ | Strongest prior adapter | 14.10% → 23.72% | **+9.62 pp** | 28.85% → 42.31% | **+13.46 pp** |
+| JavaScript → Python | Raw RepoTransAgent | 34.08% → 50.28% | **+16.20 pp** | 72.63% → 96.65% | **+24.02 pp** |
+| JavaScript → Python | Strongest prior adapter | 35.75% → 50.28% | **+14.53 pp** | 72.63% → 96.65% | **+24.02 pp** |
 
-These results compare 335 valid tasks with saved single-run controls on `cx/gpt-6-luna(low)`. The fresh eight-task confirmation for each direction tied on full success. The supplied tests were visible or executable during generation, and a separate evaluator scored the candidates afterward. [Evaluation details and per-repository results](docs/finish-recovery.md)
+The raw RepoTransAgent rows show the gains for the full enhanced method. The strongest prior adapter rows show the gains associated with adding finish recovery. Gains are in percentage points (pp), calculated from the original counts. Compile rate measures native builds for C++ and syntax, imports, and test collection for Python.
+
+These results compare 156 Python → C++ and 179 JavaScript → Python tasks with saved single-run controls on `cx/gpt-6-luna(low)`. The fresh eight-task confirmation for each direction tied on full success. The supplied tests were visible or executable during generation, and a separate evaluator scored the candidates afterward. Compared with the strongest prior adapters, reported token use rose by 71.2% for Python → C++ and 91.3% for JavaScript → Python. [Evaluation details and per-repository results](docs/finish-recovery.md)
 
 #### Run the enhanced agent
 
